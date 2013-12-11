@@ -62,6 +62,10 @@ module JavaBuildpack::Application
       self
     end
 
+    def add_option_string(option_string)
+      self << option_string
+    end
+
     # Returns the contents as an environment variable formatted as +JAVA_OPTS="<value1> <value2>"+
     #
     # @return [String] the contents as an environment variable

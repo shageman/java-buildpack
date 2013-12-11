@@ -35,13 +35,15 @@ module JavaBuildpack::Jre
       download_tar
       copy_resources
       mutate_killjava
+      mutate_memcalc
+      copy_buildpack
     end
 
     def release
       @application.java_opts
       .add_system_property('java.io.tmpdir', '$TMPDIR')
       .add_option('-XX:OnOutOfMemoryError', killjava)
-      .concat memory
+      .add_option_string("`#{memcalc}`")
     end
 
     protected
@@ -56,12 +58,23 @@ module JavaBuildpack::Jre
 
     KEY_MEMORY_SIZES = 'memory_sizes'.freeze
 
+    def copy_buildpack
+      dir = File.expand_path(File.dirname(__FILE__))
+      puts `echo #{dir}`
+      FileUtils.cp_r(File.join(dir,'../../../lib'), home + 'bin')
+      FileUtils.cp_r(File.join(dir,'../../../config'), home + 'bin')
+    end
+
     def killjava
       home + 'bin/killjava'
     end
 
+    def memcalc
+      home + 'bin/memcalc'
+    end
+
     def memory
-      sizes = @configuration[KEY_MEMORY_SIZES] || {}
+      sizes      = @configuration[KEY_MEMORY_SIZES] || {}
       heuristics = @configuration[KEY_MEMORY_HEURISTICS] || {}
       OpenJDKMemoryHeuristicFactory.create_memory_heuristic(sizes, heuristics, @version).resolve
     end
@@ -72,6 +85,20 @@ module JavaBuildpack::Jre
                     JavaBuildpack::Diagnostics.get_buildpack_log(@application).relative_path_from(killjava.dirname).to_s
 
       killjava.open('w') do |f|
+        f.write content
+        f.fsync
+      end
+    end
+
+    def mutate_memcalc
+      content = memcalc.read
+      content.gsub! /@@LOG_FILE_NAME@@/,
+                    JavaBuildpack::Diagnostics.get_buildpack_log(@application).relative_path_from(killjava.dirname).to_s
+      content.gsub! /@@MEMORY_SIZES@@/, "#{@configuration[KEY_MEMORY_SIZES] || {}}"
+      content.gsub! /@@MEMORY_HEURISTICS@@/, "#{@configuration[KEY_MEMORY_HEURISTICS] || {}}"
+      content.gsub! /@@JRE_VERSION@@/, "'#{@version}'"
+
+      memcalc.open('w') do |f|
         f.write content
         f.fsync
       end

@@ -15,23 +15,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Kill script for use as the parameter of OpenJDK's -XX:OnOutOfMemoryError.
+# JVM memory settings calculator.
 #
 # It should be placed in the buildpack diagnostic directory so it logs to
 # the same log file as the rest of the buildpack.
 
+dir = File.join(File.expand_path(File.dirname(__FILE__)), 'lib')
+$:.unshift dir
+
+require 'java_buildpack/buildpack'
+require 'java_buildpack/jre/memory/openjdk_memory_heuristic_factory'
+require 'java_buildpack/util/tokenized_version'
 require 'time'
 
 $stdout.sync = true
 $stderr.sync = true
 
-module Kill
+build_dir = File.join(dir, '..', '..', 'lib')
+
+module MemCalc
 
   def self.log(log_data)
     log_file_name = "#{File.dirname(__FILE__)}/@@LOG_FILE_NAME@@"
     File.open(log_file_name, 'a') do |log_file|
       log_file.sync = true
-      log_file.write "#{log_data} @ #{Kill.time_in_millis}\n"
+      log_file.write "#{log_data} @ #{MemCalc.time_in_millis}\n"
       log_file.fsync
     end
   end
@@ -40,21 +48,22 @@ module Kill
     Time.now.xmlschema(3).sub(/T/, ' ')
   end
 
-  def self.log_process_tree
-    Kill.log(`ps -AHF`)
+  def self.memory
+    sizes         = @@MEMORY_SIZES@@
+    heuristics    = @@MEMORY_HEURISTICS@@
+    version       = JavaBuildpack::Util::TokenizedVersion.new(@@JRE_VERSION@@)
+    JavaBuildpack::Jre::OpenJDKMemoryHeuristicFactory.create_memory_heuristic(sizes, heuristics, version).resolve
   end
 
 end
 
 begin
-  Kill.log_process_tree
-  # Kill all processes whose parameters match -XX:OnOutOfMemoryError and the name of this script.
-  # This script can be renamed as necessary without modifying its code.
-  command = "pkill -9 -f .*-XX:OnOutOfMemoryError=.*#{File.basename(__FILE__)}.*"
-  Kill.log("#{__FILE__} attempting to kill Java processes using `#{command}`")
-  system command
-  Kill.log_process_tree
+  JavaBuildpack::Buildpack.drive_buildpack_with_logger(build_dir, 'Compile failed with exception %s') do |_|
+    settings = MemCalc.memory
+    MemCalc.log("#{__FILE__} calculated JVM memory settings: `#{settings}`")
+    puts settings.join ' '
+  end
 rescue => e
-  Kill.log("#{__FILE__} failed with exception #{e.inspect}, #{e.backtrace}\n")
+  MemCalc.log("#{__FILE__} failed with exception #{e.inspect}, #{e.backtrace}\n")
   abort e.message
 end
