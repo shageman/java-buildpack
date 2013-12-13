@@ -43,7 +43,7 @@ module JavaBuildpack::Jre
       @application.java_opts
       .add_system_property('java.io.tmpdir', '$TMPDIR')
       .add_option('-XX:OnOutOfMemoryError', killjava)
-      .add_option_string("`#{memcalc}`")
+      .add_option_string("`#{memcalc} $PWD`")
     end
 
     protected
@@ -61,8 +61,8 @@ module JavaBuildpack::Jre
     def copy_buildpack
       dir = File.expand_path(File.dirname(__FILE__))
       puts `echo #{dir}`
-      FileUtils.cp_r(File.join(dir,'../../../lib'), home + 'bin')
-      FileUtils.cp_r(File.join(dir,'../../../config'), home + 'bin')
+      FileUtils.cp_r(File.join(dir, '../../../lib'), home + 'bin')
+      FileUtils.cp_r(File.join(dir, '../../../config'), home + 'bin')
     end
 
     def killjava
@@ -92,8 +92,6 @@ module JavaBuildpack::Jre
 
     def mutate_memcalc
       content = memcalc.read
-      content.gsub! /@@LOG_FILE_NAME@@/,
-                    JavaBuildpack::Diagnostics.get_buildpack_log(@application).relative_path_from(killjava.dirname).to_s
       content.gsub! /@@MEMORY_SIZES@@/, "#{@configuration[KEY_MEMORY_SIZES] || {}}"
       content.gsub! /@@MEMORY_HEURISTICS@@/, "#{@configuration[KEY_MEMORY_HEURISTICS] || {}}"
       content.gsub! /@@JRE_VERSION@@/, "'#{@version}'"

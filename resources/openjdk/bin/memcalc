@@ -17,12 +17,13 @@
 
 # JVM memory settings calculator.
 #
-# It should be placed in the buildpack diagnostic directory so it logs to
-# the same log file as the rest of the buildpack.
+# When run as a separate process, the exit status is 0 in the successful case
+# and non-zero in failure cases (in which case an error should be logged).
 
 dir = File.join(File.expand_path(File.dirname(__FILE__)), 'lib')
 $:.unshift dir
 
+require 'java_buildpack/diagnostics/logger_factory'
 require 'java_buildpack/buildpack'
 require 'java_buildpack/jre/memory/openjdk_memory_heuristic_factory'
 require 'java_buildpack/util/tokenized_version'
@@ -31,39 +32,28 @@ require 'time'
 $stdout.sync = true
 $stderr.sync = true
 
-build_dir = File.join(dir, '..', '..', 'lib')
+build_dir = ARGV[0]
 
 module MemCalc
 
-  def self.log(log_data)
-    log_file_name = "#{File.dirname(__FILE__)}/@@LOG_FILE_NAME@@"
-    File.open(log_file_name, 'a') do |log_file|
-      log_file.sync = true
-      log_file.write "#{log_data} @ #{MemCalc.time_in_millis}\n"
-      log_file.fsync
-    end
-  end
-
-  def self.time_in_millis
-    Time.now.xmlschema(3).sub(/T/, ' ')
-  end
-
   def self.memory
-    sizes         = @@MEMORY_SIZES@@
-    heuristics    = @@MEMORY_HEURISTICS@@
-    version       = JavaBuildpack::Util::TokenizedVersion.new(@@JRE_VERSION@@)
+    sizes      = @@MEMORY_SIZES@@
+    heuristics = @@MEMORY_HEURISTICS@@
+    version    = JavaBuildpack::Util::TokenizedVersion.new(@@JRE_VERSION@@)
     JavaBuildpack::Jre::OpenJDKMemoryHeuristicFactory.create_memory_heuristic(sizes, heuristics, version).resolve
   end
 
 end
 
-begin
-  JavaBuildpack::Buildpack.drive_buildpack_with_logger(build_dir, 'Compile failed with exception %s') do |_|
+JavaBuildpack::Buildpack.drive_buildpack_with_logger(build_dir, 'Compile failed with exception %s') do |_|
+  logger = JavaBuildpack::Diagnostics::LoggerFactory.get_logger
+  begin
     settings = MemCalc.memory
-    MemCalc.log("#{__FILE__} calculated JVM memory settings: `#{settings}`")
+    logger.info("#{__FILE__} calculated JVM memory settings: `#{settings}`")
     puts settings.join ' '
+  rescue => e
+    logger.error("#{__FILE__} failed with exception #{e.inspect}")
+    logger.debug("Exception #{e.inspect} backtrace:\n#{e.backtrace.join("\n")}")
+    abort e.message
   end
-rescue => e
-  MemCalc.log("#{__FILE__} failed with exception #{e.inspect}, #{e.backtrace}\n")
-  abort e.message
 end

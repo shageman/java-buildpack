@@ -62,6 +62,10 @@ module JavaBuildpack::Application
       self
     end
 
+    # Adds an arbitrary string to +JAVA_OPTS+.
+    #
+    # @param [String] option_string the string
+    # @return [JavaOpts] +self+ for chaining
     def add_option_string(option_string)
       self << option_string
     end

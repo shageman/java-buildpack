@@ -46,13 +46,6 @@ describe JavaBuildpack::Jre::OpenJdk do
     expect(java_home).to eq('$PWD/.openjdk')
   end
 
-  it 'should add memory options to java_opts' do
-    component.release
-
-    expect(java_opts).to include('opt-1')
-    expect(java_opts).to include('opt-2')
-  end
-
   it 'adds OnOutOfMemoryError to java_opts' do
     component.release
 
@@ -71,6 +64,12 @@ describe JavaBuildpack::Jre::OpenJdk do
     component.release
 
     expect(java_opts).to include('-Djava.io.tmpdir=$TMPDIR')
+  end
+
+  it 'adds the memory calculation to java_opts' do
+    component.release
+
+    expect(java_opts).to include('`$PWD/.openjdk/bin/memcalc`')
   end
 
 end
