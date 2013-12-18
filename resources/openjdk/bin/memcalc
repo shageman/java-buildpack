@@ -54,6 +54,7 @@ JavaBuildpack::Buildpack.drive_buildpack_with_logger(build_dir, 'Compile failed 
   rescue => e
     logger.error("#{__FILE__} failed with exception #{e.inspect}")
     logger.debug("Exception #{e.inspect} backtrace:\n#{e.backtrace.join("\n")}")
+    puts '-Xmx0k' # ensure start fails
     abort e.message
   end
 end

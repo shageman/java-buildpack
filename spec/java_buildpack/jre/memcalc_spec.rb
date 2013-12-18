@@ -38,6 +38,10 @@ describe 'memcalc script' do
 
   it 'should calculate memory settings when $MEMORY_LIMIT is set', memory_limit: '1G' do
     expect(target).to match(/-Xmx768M -Xms768M -XX:MaxPermSize=104857K -XX:PermSize=104857K -Xss1M/)
+  end
+
+  it 'should return status 0 when $MEMORY_LIMIT is acceptable', memory_limit: '1G' do
+    target
     expect($CHILD_STATUS.exitstatus).to eq(0)
   end
 
@@ -46,7 +50,7 @@ describe 'memcalc script' do
     expect(log_contents).to match /calculated JVM memory settings:.*-Xmx768M.*-Xms768M.*-XX:MaxPermSize=104857K.*-XX:PermSize=104857K.*-Xss1M/
   end
 
-  it 'should raise error when memory calculation fails because $MEMORY_LIMIT is too small', memory_limit: '1m' do
+  it 'should return status when memory calculation fails because $MEMORY_LIMIT is too small', memory_limit: '1m' do
     target
     expect($CHILD_STATUS.exitstatus).to eq(1)
   end
@@ -54,6 +58,10 @@ describe 'memcalc script' do
   it 'should log an appropriate error when memory calculation fails because $MEMORY_LIMIT is too small', memory_limit: '1m' do
     target
     expect(log_contents).to match /Total memory 1M exceeded by configured memory/
+  end
+
+  it 'should return invalid memory settings when $MEMORY_LIMIT is too small', memory_limit: '1m' do
+    expect(target).to match(/-Xmx0k/)
   end
 
   def copy_buildpack
