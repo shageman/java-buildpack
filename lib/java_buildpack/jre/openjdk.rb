@@ -32,6 +32,7 @@ module JavaBuildpack::Jre
     end
 
     def compile
+      check_memory
       download_tar
       copy_resources
       mutate_killjava
@@ -43,7 +44,7 @@ module JavaBuildpack::Jre
       @application.java_opts
       .add_system_property('java.io.tmpdir', '$TMPDIR')
       .add_option('-XX:OnOutOfMemoryError', killjava)
-      .add_option_string("`#{memcalc} $PWD`")
+      .add_option_string("`$PWD/#{@application.relative_path_to(memcalc)} $PWD`")
     end
 
     protected
@@ -73,7 +74,7 @@ module JavaBuildpack::Jre
       home + 'bin/memcalc'
     end
 
-    def memory
+    def check_memory
       sizes      = @configuration[KEY_MEMORY_SIZES] || {}
       heuristics = @configuration[KEY_MEMORY_HEURISTICS] || {}
       OpenJDKMemoryHeuristicFactory.create_memory_heuristic(sizes, heuristics, @version).resolve

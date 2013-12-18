@@ -22,54 +22,65 @@ require 'java_buildpack/jre/memory/weight_balancing_memory_heuristic'
 describe JavaBuildpack::Jre::OpenJdk do
   include_context 'component_helper'
 
-  let(:memory_heuristic) { double('MemoryHeuristic', resolve: %w(opt-1 opt-2)) }
-
   before do
     allow(JavaBuildpack::Jre::WeightBalancingMemoryHeuristic).to receive(:new).and_return(memory_heuristic)
   end
 
-  it 'should detect with id of openjdk-<version>' do
-    expect(component.detect).to eq("openjdk=#{version}")
+  context do
+    let(:memory_heuristic) { double('MemoryHeuristic', resolve: %w(opt-1 opt-2)) }
+
+    it 'should detect with id of openjdk-<version>' do
+      expect(component.detect).to eq("openjdk=#{version}")
+    end
+
+    it 'should extract Java from a GZipped TAR',
+       cache_fixture: 'stub-java.tar.gz' do
+
+      component.compile
+
+      expect(app_dir + '.openjdk/bin/java').to exist
+    end
+
+    it 'adds the JAVA_HOME to java_home' do
+      component
+
+      expect(java_home).to eq('$PWD/.openjdk')
+    end
+
+    it 'adds OnOutOfMemoryError to java_opts' do
+      component.release
+
+      expect(java_opts).to include('-XX:OnOutOfMemoryError=$PWD/.openjdk/bin/killjava')
+    end
+
+    it 'places the killjava script (with appropriately substituted content) in the diagnostics directory',
+       cache_fixture: 'stub-java.tar.gz' do
+
+      component.compile
+
+      expect((app_dir + '.openjdk/bin/killjava').read).to include '}/../../.buildpack-diagnostics/buildpack.log'
+    end
+
+    it 'adds java.io.tmpdir to java_opts' do
+      component.release
+
+      expect(java_opts).to include('-Djava.io.tmpdir=$TMPDIR')
+    end
+
+    it 'adds the memory calculation to java_opts' do
+      component.release
+
+      expect(java_opts).to include('`$PWD/.openjdk/bin/memcalc $PWD`')
+    end
   end
 
-  it 'should extract Java from a GZipped TAR',
-     cache_fixture: 'stub-java.tar.gz' do
+  context do
+    let(:memory_heuristic) { double('MemoryHeuristic', resolve: %w(opt-1 opt-2)) }
 
-    component.compile
-
-    expect(app_dir + '.openjdk/bin/java').to exist
-  end
-
-  it 'adds the JAVA_HOME to java_home' do
-    component
-
-    expect(java_home).to eq('$PWD/.openjdk')
-  end
-
-  it 'adds OnOutOfMemoryError to java_opts' do
-    component.release
-
-    expect(java_opts).to include('-XX:OnOutOfMemoryError=$PWD/.openjdk/bin/killjava')
-  end
-
-  it 'places the killjava script (with appropriately substituted content) in the diagnostics directory',
-     cache_fixture: 'stub-java.tar.gz' do
-
-    component.compile
-
-    expect((app_dir + '.openjdk/bin/killjava').read).to include '}/../../.buildpack-diagnostics/buildpack.log'
-  end
-
-  it 'adds java.io.tmpdir to java_opts' do
-    component.release
-
-    expect(java_opts).to include('-Djava.io.tmpdir=$TMPDIR')
-  end
-
-  it 'adds the memory calculation to java_opts' do
-    component.release
-
-    expect(java_opts).to include('`$PWD/.openjdk/bin/memcalc`')
+    it 'should fail compile if the memory heuristics cannot be resolved' do
+      expect(memory_heuristic).to receive(:resolve).and_raise('test')
+      expect { component.compile }.to raise_error(/test/)
+    end
   end
 
 end
